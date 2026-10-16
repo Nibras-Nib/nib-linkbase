@@ -38,6 +38,33 @@ No test runner is configured, so there is no test command yet.
 - **Generated route types.** `LayoutProps<"/">` (and the matching `PageProps`) are global types generated into `.next/types` by `next dev`, `next build`, or `next typegen` — they are not imported. Run `next typegen` before `tsc` on a fresh checkout or after adding routes.
 - **Path alias:** `@/*` resolves to the repository root (there is no `src/` directory).
 
+## Live Docs (Context7)
+
+Before writing code that uses Next.js, React, Mongoose, NextAuth (Auth.js), Zod, Tailwind CSS, or any other third-party library, pull current docs through the Context7 MCP server (`resolve-library-id`, then `query-docs`). Do not rely on training data for API signatures, config options, or version-specific behaviour — check the installed version in `package.json` and query docs for that version.
+
+- **Next.js:** the bundled docs in `node_modules/next/dist/docs/` match the installed version exactly and take precedence; use Context7 to supplement them, not replace them.
+- **No Context7 entry:** if Context7 has no entry for a library (or none for the installed version), say so before proceeding, and name the source used instead (bundled docs, the package's README or type definitions in `node_modules`).
+- **Context7 unavailable:** if the server fails to connect, say so rather than silently falling back to training data.
+
+## Doc Convention
+
+Whenever a new file is created in `/docs`, add it to the Project Docs section below with one line on what it covers and when to read it.
+
+## Project Docs
+
+- `docs/architecture.md` — rendering model (Server vs Client Components, Server Actions), directory layout (`app/`, `components/ui`, `components/[feature]`, `lib/db`, `lib/auth`, `lib/types`), and naming conventions. Read before adding a file, folder, route, or Server Action.
+- `docs/auth.md` — NextAuth (Auth.js v5) setup, JWT sessions, deny-by-default `proxy.ts`, `requireUserId()` in every Server Action, ownership checks on `userId`, and the public `/user/[handle]` exception. Read before adding a route, Server Action, Route Handler, or anything that reads the session.
+- `docs/coding-standards.md` — TypeScript strict mode, Prettier and ESLint setup (plus rules to add), import order, component and export conventions, async/await, and error handling. Read before writing or reviewing any code.
+- `docs/data-fetching.md` — reads in Server Components through `lib/db` (no internal API calls), `userId` vs `handle` scoping, props to Client Components, `'use cache'` with `cacheTag` / `cacheLife`, and which tags each write clears with `updateTag`. Read before writing a query, a page that loads data, or a Server Action that writes.
+- `docs/data-mutations.md` — the five steps every Server Action follows (session, Zod validation, `userId`-scoped write, `updateTag`, `ActionResult`), scoped write patterns, which tags each mutation clears, how the UI calls actions, and a pre-merge checklist. Read before writing or reviewing any Server Action.
+- `docs/database.md` — MongoDB + Mongoose: cached connection helper (`lib/db/connect.ts`), models in `lib/db/models`, schema options and indexes, per-user query scoping, serialization, and caching. Read before writing a model, query, or Server Action that touches the database.
+- `docs/design-system.md` — design foundations: color palette and semantic aliases, typography, spacing, radius, shadows, motion, and the Tailwind theme values. Read before choosing any color, font, size, or spacing value, or when setting up theme tokens.
+- `docs/errors-and-validation.md` — Zod validation at the Server Action boundary with schemas in `lib/validation`, the `ActionResult` type for inline field errors, `useActionState` forms, thrown errors caught by `error.tsx`, and logging through `onRequestError` without leaking messages to the client. Read before writing a Server Action, form, schema, or error handling.
+- `docs/git-conventions.md` — Conventional Commits types and subject rules, `<type>/<description>` branch names, one branch per feature, PRs with required human approval, squash merging, and `main` branch protection. Read before creating a branch, committing, or opening a PR.
+- `docs/routing.md` — route map, `(auth)` / `(dashboard)` route groups and the single root layout, when to add `layout` / `loading` / `error` / `not-found`, `params` behind `<Suspense>`, Server Actions for all mutations, and Route Handlers limited to `app/api` webhooks and callbacks. Read before adding or moving a route or Route Handler.
+- `docs/security.md` — secrets in env vars with `.env.example` as the template, security headers and CSP in `next.config.ts`, MongoDB-backed rate limits on sign-in and link creation, escaping user content, URL protocol checks, and `rel="noopener noreferrer"` on outbound links. Read before adding an env var, header, third-party origin, rate-limited action, or anything that renders user content.
+- `docs/ui.md` — component specs (Button, IconButton, Input, Switch, Tabs, Avatar, Badge, Card, LinkButton, ProfileCard, Accordion), marketing layout patterns, and accessibility rules. Read before building or changing any component or page layout.
+
 ## AGENTS.md
 
 The `nextjs-agent-rules` block in `AGENTS.md` is managed by `next dev`, which rewrites it if it is removed. Put project-specific instructions outside the `BEGIN`/`END` markers (or in this file) and commit the block as-is.
