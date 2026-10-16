@@ -26,6 +26,7 @@ lib/
   auth/                  Auth helpers (session lookup, access checks)
   actions/               Server Actions shared by more than one route
   validation/            Zod schemas and the ActionResult type
+  security/              Rate limiting and other cross-cutting security helpers
   types/                 Shared TypeScript types
 docs/                    Project documentation
 public/                  Static assets
@@ -47,6 +48,7 @@ Shared, non-UI code. Each concern has its own folder:
 - **`lib/auth/`** — helpers for reading the session and checking access. Server-only.
 - **`lib/actions/`** — Server Actions used by more than one route. Actions used by one route live in that route's `actions.ts` (see `docs/routing.md`).
 - **`lib/validation/`** — Zod schemas shared by Server Actions and forms, and the `ActionResult` type. No database access, so Client Components may import it (see `docs/errors-and-validation.md`).
+- **`lib/security/`** — rate limiting and other security helpers. Server-only (see `docs/security.md`).
 - **`lib/types/`** — shared TypeScript types and interfaces. Types used by only one file stay in that file.
 
 Mark server-only modules with `import 'server-only'` so importing them from a Client Component fails the build (install the `server-only` package when the first such module is added).

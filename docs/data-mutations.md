@@ -51,6 +51,8 @@ export async function updateLink(
 
 `requireUserId()` is the first line of every action, before anything else runs. The action is a public POST endpoint; neither the page it's used on nor Proxy protects it. See `docs/auth.md`, "Server Actions".
 
+Actions with a rate limit (`createLink`, sign-in) check it right after the session and before validation, and return a `formFailure` when it's hit. See `docs/security.md`, "Rate limiting".
+
 ### 2. Validate
 
 Parse **all** input with the matching schema from `lib/validation/` using `safeParse`: `FormData` fields, plain arguments, and arguments bound with `.bind()`. TypeScript parameter types aren't checked at runtime. A failed parse returns `validationFailure(error)`, which the form renders next to each field. See `docs/errors-and-validation.md`.
@@ -165,4 +167,4 @@ Before merging an action, check that:
 - [ ] Nothing returned or thrown includes raw error messages, stack traces, or other users' data.
 - [ ] The action isn't defined inline in a component with secrets in scope. Closed-over values are encrypted and sent to the client and back; keep actions in `actions.ts` files.
 
-Rate limiting for actions is **TBD**.
+- [ ] Actions that create public content, send email, or are cheap to call and expensive to serve have a rate limit (`docs/security.md`).

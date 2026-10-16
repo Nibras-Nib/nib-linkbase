@@ -120,7 +120,7 @@ Use OAuth providers (or email magic links). Don't add the Credentials provider f
 | `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET` | OAuth credentials, one pair per provider (`AUTH_<PROVIDER>_ID` / `_SECRET`). |
 | `AUTH_URL` | Only when the canonical URL can't be inferred, for example behind a reverse proxy. |
 
-Set them in `.env.local` in development. Never commit them. Rotating `AUTH_SECRET` signs everyone out.
+Set them in `.env.local` in development and list them in `.env.example` (`docs/security.md`, "Secrets"). Never commit real values. Rotating `AUTH_SECRET` signs everyone out.
 
 ## Proxy
 
