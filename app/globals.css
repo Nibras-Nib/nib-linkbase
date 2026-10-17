@@ -1,26 +1,140 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Linkbase design tokens. Source of truth: docs/design-system.md */
+@theme {
+  /* Clay (primary accent) */
+  --color-clay-50: #fbf1eb;
+  --color-clay-100: #f4dccf;
+  --color-clay-300: #e0a083;
+  --color-clay-500: #b5532f;
+  --color-clay-600: #9e4626;
+  --color-clay-700: #823820;
+  --color-clay-900: #4a1f12;
+
+  /* Olive (secondary brand / success) */
+  --color-olive-50: #f2f3e6;
+  --color-olive-100: #e3e6cc;
+  --color-olive-300: #b5be84;
+  --color-olive-500: #6b7a3a;
+  --color-olive-600: #5a682f;
+  --color-olive-700: #46521f;
+  --color-olive-900: #262d10;
+
+  /* Ochre and bark */
+  --color-ochre-100: #f6e6bf;
+  --color-ochre-300: #ebc572;
+  --color-ochre-500: #d9a441;
+  --color-ochre-700: #8f6519;
+  --color-bark-700: #5a3f2e;
+  --color-bark-900: #3b2a1e;
+
+  /* Warm neutrals */
+  --color-white: #ffffff;
+  --color-cream-50: #fbf7f0;
+  --color-cream-100: #f6efe2;
+  --color-cream-200: #efe5d3;
+  --color-sand-300: #e0d2ba;
+  --color-sand-400: #c9b89c;
+  --color-ink-400: #9a8c7e;
+  --color-ink-500: #6f6154;
+  --color-ink-700: #4a3d31;
+  --color-ink-900: #2a2118;
+
+  /* Feedback */
+  --color-red-100: #f5d8d0;
+  --color-red-500: #b03a28;
+
+  /* Semantic aliases */
+  --color-page: #f6efe2;
+  --color-surface-card: #ffffff;
+  --color-surface-raised: #fbf7f0;
+  --color-surface-sunken: #efe5d3;
+  --color-surface-inverse: #2a2118;
+  --color-fg-primary: #2a2118;
+  --color-fg-secondary: #4a3d31;
+  --color-fg-muted: #6f6154;
+  --color-fg-inverse: #fbf7f0;
+  --color-fg-on-accent: #ffffff;
+  --color-line-subtle: #efe5d3;
+  --color-line: #e0d2ba;
+  --color-line-strong: #2a2118;
+  --color-accent: #b5532f;
+  --color-accent-hover: #9e4626;
+  --color-accent-press: #823820;
+  --color-accent-soft: #f4dccf;
+  --color-success: #5a682f;
+  --color-success-soft: #e3e6cc;
+  --color-warning: #8f6519;
+  --color-warning-soft: #f6e6bf;
+  --color-danger: #b03a28;
+  --color-danger-soft: #f5d8d0;
+  --color-overlay-hover: rgba(42, 33, 24, 0.06);
+  --color-overlay-press: rgba(42, 33, 24, 0.1);
+
+  /* Type scale */
+  --text-display-xl: 76px;
+  --text-display-xl--line-height: 0.98;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-xl--font-weight: 800;
+  --text-display-l: 60px;
+  --text-display-l--line-height: 1;
+  --text-display-l--letter-spacing: -0.03em;
+  --text-display-l--font-weight: 800;
+  --text-display-m: 44px;
+  --text-display-m--line-height: 1.02;
+  --text-display-m--letter-spacing: -0.03em;
+  --text-display-m--font-weight: 800;
+  --text-h1: 34px;
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h1--font-weight: 700;
+  --text-h2: 26px;
+  --text-h2--line-height: 1.15;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 700;
+  --text-h3: 20px;
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.015em;
+  --text-h3--font-weight: 700;
+  --text-body-l: 18px;
+  --text-body-l--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-body-s: 14px;
+  --text-body-s--line-height: 1.5;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+
+  --tracking-display: -0.03em;
+  --tracking-heading: -0.015em;
+  --tracking-wordmark: -0.035em;
+  --tracking-caps: 0.08em;
+
+  /* Radius */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+
+  /* Shadows (warm ink tint) */
+  --shadow-sm: 0 1px 2px rgba(42, 33, 24, 0.08), 0 0 0 1px rgba(42, 33, 24, 0.04);
+  --shadow-md: 0 8px 24px -8px rgba(42, 33, 24, 0.2);
+  --shadow-lg: 0 28px 56px -20px rgba(42, 33, 24, 0.32);
+  --shadow-focus: 0 0 0 3px rgba(181, 83, 47, 0.32);
+
+  /* Motion (durations use the numeric utilities: duration-120 / 200 / 360) */
+  --ease-brand: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Layout */
+  --container-container: 1200px;
 }
 
+/* Font variables are set on <html> by next/font in app/layout.tsx */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-commissioner), "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-commissioner), "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", monospace;
 }
