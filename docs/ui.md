@@ -60,6 +60,11 @@ Field 52px tall, padding-x 16, radius 14, fill `cream-200`, 1.5px transparent bo
 | Disabled | **TBD** |
 | Tone `light` | `bg-white` at rest (for colored sections) |
 
+`suffix` renders a node inside the field after the input (pulled 8px into the right padding), such as an icon button.
+
+### PasswordInput
+Client Component (`components/ui/password-input.tsx`) built on `Input`. Its `suffix` is a 40×40 ghost icon button (radius 10, 20px `Eye` / `EyeOff`, `text-fg-muted`, hover `bg-overlay-hover`) that switches the field between `type="password"` and `type="text"`. The button is `type="button"` so it never submits the form, has `aria-label` "Show password" / "Hide password" and `aria-pressed`, and shows `shadow-focus`. Each field toggles on its own. Use it for every password field, with `autoComplete` set to `current-password` on log-in and `new-password` on sign-up.
+
 The prefix (e.g. `linkbase.me/`) is static text in `ink-500` inside the box. Placeholder is `ink-400`.
 Error copy offers a fix: "That name is taken. Try mara.studio".
 

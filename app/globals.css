@@ -138,3 +138,9 @@
   --font-display: var(--font-commissioner), "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", monospace;
 }
+
+/* PasswordInput has its own show/hide button; hide Edge's built-in reveal and clear buttons so there's only one */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}

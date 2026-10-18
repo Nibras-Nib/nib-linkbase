@@ -25,6 +25,7 @@ Read these on every feature:
 
 - `docs/architecture.md`: directory layout, Server vs Client Components, naming.
 - `docs/coding-standards.md`: TypeScript, imports, exports, error handling.
+- The `vercel-react-best-practices` skill, whenever the feature adds or changes React components, pages, data loading, or Server Actions. Apply its rules within the project conventions (see "React performance rules" in `CLAUDE.md`).
 
 Then read every doc listed under the plan's **Docs referenced**, plus any feature-area doc it touches that the plan missed:
 

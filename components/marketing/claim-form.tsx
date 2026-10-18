@@ -28,7 +28,8 @@ export function ClaimForm({ cta }: ClaimFormProps) {
       setError('Pick a name first')
       return
     }
-    router.push(`/login?handle=${encodeURIComponent(handle)}`)
+    // The handle isn't used at sign-up; choosing one is part of onboarding (not built yet)
+    router.push('/signup')
   }
 
   return (

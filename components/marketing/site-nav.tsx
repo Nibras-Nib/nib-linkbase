@@ -1,5 +1,7 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 
+import { AccountNav, AccountNavSkeleton } from '@/components/auth/account-nav'
 import { Button } from '@/components/ui/button'
 
 const navLinks = [
@@ -29,11 +31,9 @@ export function SiteNav() {
             </Button>
           ))}
         </div>
-        <div className="flex flex-none gap-2">
-          <Button href="/login" variant="dark" size="sm">
-            Sign up free
-          </Button>
-        </div>
+        <Suspense fallback={<AccountNavSkeleton />}>
+          <AccountNav />
+        </Suspense>
       </nav>
     </div>
   )

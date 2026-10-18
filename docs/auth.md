@@ -2,7 +2,7 @@
 
 How users sign in, how sessions work, and how access is enforced. Read `docs/architecture.md` for where `lib/auth/` code lives and `docs/database.md` for the query-scoping rules this file relies on.
 
-NextAuth (Auth.js v5, the `next-auth` package) is not installed yet. Add `next-auth` and `@auth/mongodb-adapter` when the first auth code is written. The adapter's `mongodb` peer dependency must match the driver version Mongoose ships with.
+Linkbase uses Auth.js v5 (`next-auth@5.0.0-beta.32`, pinned because v5 is still published under the `beta` tag) with the **Credentials provider**: users sign up and log in with email and password only (no name, no username). There is no database adapter. Auth.js doesn't use one for Credentials, so users live in our own Mongoose `User` model (`lib/db/models/user.ts`).
 
 ---
 
@@ -26,8 +26,8 @@ Proxy keeps signed-out visitors away from dashboard pages. It does **not** prote
 |---|---|
 | `app/(dashboard)/**` | Signed-in users only. Protected by default. |
 | `/user/[handle]` | Public. Anyone can view, signed in or not. Read-only. |
-| `/login` (`app/(auth)/login`) | Public. |
-| `/api/auth/*` | Public. Auth.js sign-in, callback, and sign-out endpoints. |
+| `/login`, `/signup` (`app/(auth)/…`) | Public. Signed-in users are redirected to `/dashboard`. |
+| `/api/auth/*` | Public. Auth.js session, CSRF, callback, and sign-out endpoints. |
 | `/` and marketing pages | Public, if listed in `PUBLIC_PATHS`. |
 
 `(dashboard)` is a route group, so it doesn't appear in the URL and Proxy can't match on it. Proxy is therefore **deny-by-default**: every request needs a session unless its path is in the public allowlist. A new page added under `app/(dashboard)/` is protected without any change to `proxy.ts`. A new public page must be added to `PUBLIC_PATHS` explicitly.
@@ -37,36 +37,44 @@ Proxy keeps signed-out visitors away from dashboard pages. It does **not** prote
 ```
 proxy.ts                           Optimistic session check on every request
 app/
-  api/auth/[...nextauth]/route.ts  Auth.js Route Handler (GET, POST)
-  (auth)/login/page.tsx            Sign-in page
+  api/auth/[...nextauth]/route.ts  Auth.js Route Handler (GET, rate-limited POST)
+  (auth)/
+    actions.ts                     signInWithCredentials, signUpWithCredentials
+    login/page.tsx                 Log-in page
+    signup/page.tsx                Sign-up page
   (dashboard)/                     Protected routes
   user/[handle]/page.tsx           Public profile
+components/auth/                   Login and signup forms, AccountNav, UserMenu, SignOutForm
 lib/auth/
-  auth-config.ts                   Shared config: providers, session, callbacks (no database)
-  auth.ts                          NextAuth instance with the MongoDB adapter: auth, signIn, signOut, handlers
+  auth-config.ts                   Shared config: session, callbacks, pages (no database)
+  auth.ts                          NextAuth instance with the Credentials provider: auth, signIn, signOut, handlers
+  password.ts                      hashPassword / verifyPassword (scrypt)
   require-user-id.ts               requireUserId(): the session check used by pages and Server Actions
+  get-session.ts                   getSession(): auth() deduplicated per request with React.cache
+  get-current-user.ts              getCurrentUser(): email for header UI (not an access check)
+lib/db/users.ts                    createUser, findUserForSignIn
+lib/validation/auth.ts             signUpSchema, signInSchema, safeCallbackUrl
 lib/types/
   next-auth.d.ts                   Adds `id` to the Session user type
 ```
 
-The auth Route Handler is one of the cases `docs/architecture.md` allows: OAuth providers call back to it, so it can't be a Server Action.
+The auth Route Handler is one of the cases `docs/architecture.md` allows: Auth.js's own session and CSRF endpoints are served from it.
 
 ## Configuration
 
-The config is split so Proxy can verify sessions without loading the database adapter.
+The config is split so Proxy can verify sessions without loading any database code.
 
 ```ts
 // lib/auth/auth-config.ts
 import type { NextAuthConfig } from 'next-auth'
-import GitHub from 'next-auth/providers/github'
 
 export const authConfig = {
-  providers: [GitHub],
+  providers: [], // added in auth.ts, because authorize() reads the database
   pages: { signIn: '/login' },
   session: {
     strategy: 'jwt',
     maxAge: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24,  // re-issue the cookie at most once a day
+    updateAge: 60 * 60 * 24, // re-issue the cookie at most once a day
   },
   callbacks: {
     session({ session, token }) {
@@ -77,50 +85,43 @@ export const authConfig = {
 } satisfies NextAuthConfig
 ```
 
-```ts
-// lib/auth/auth.ts
-import 'server-only'
-import NextAuth from 'next-auth'
-import { MongoDBAdapter } from '@auth/mongodb-adapter'
-import { connectToDatabase } from '@/lib/db/connect'
-import { authConfig } from '@/lib/auth/auth-config'
+`lib/auth/auth.ts` spreads `authConfig` and adds `Credentials({ authorize })`. `authorize` validates the input with `signInSchema`, looks the user up with `findUserForSignIn`, and checks the password with `verifyPassword`. When the email has no account it runs `verifyPasswordAgainstDummy` instead, so a missing user takes as long as a wrong password. It returns `{ id, email }` or `null`.
 
-// Reuse the Mongoose connection pool; never open a second MongoClient.
-async function getMongoClient() {
-  const mongoose = await connectToDatabase()
-  return mongoose.connection.getClient()
-}
+The returned `id` is the user's MongoDB `_id`. It becomes `token.sub`, and the `session` callback exposes it as `session.user.id`: the `userId` every Linkbase document references (see `docs/database.md`).
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
-  adapter: MongoDBAdapter(getMongoClient()),
-})
-```
+**Why JWT sessions:** the session is an encrypted cookie that Proxy can verify without a database round trip, which the Next.js docs require for Proxy checks. Credentials also only works with JWT sessions. The cost is that a session can't be revoked server-side before it expires, so `maxAge` is kept short.
 
-```ts
-// app/api/auth/[...nextauth]/route.ts
-import { handlers } from '@/lib/auth/auth'
+### Passwords
 
-export const { GET, POST } = handlers
-```
+- Hashed with Node's built-in `crypto.scrypt` (N=2^15, r=8, p=1, 16-byte salt, 64-byte key) and stored as `scrypt$N$r$p$<salt>$<hash>`. The parameters are stored with each hash, so the cost can be raised later without breaking existing hashes.
+- Compared with `timingSafeEqual`. Passwords are NFKC-normalized before hashing.
+- `passwordHash` has `select: false`. `findUserForSignIn` is the only query that reads it; never return it from `lib/db`.
+- Sign-up rules: 8–128 characters with a letter and a number, entered twice (`password` and `confirmPassword` must match; the mismatch error shows under the confirm field). `confirmPassword` is only checked, never stored (`signUpSchema`). Sign-in only checks that a password was entered, so rule changes don't lock out existing users.
 
-The adapter stores users and linked OAuth accounts in MongoDB (`users`, `accounts`). The user's `_id` is the `userId` that every Linkbase document references (see `docs/database.md`). `token.sub` holds it, and the `session` callback exposes it as `session.user.id`.
+### Sign-up and sign-in flow
 
-**Why JWT sessions:** the session is an encrypted cookie that Proxy can verify without a database round trip, which the Next.js docs require for Proxy checks. The cost is that a session can't be revoked server-side before it expires, so `maxAge` is kept short.
+Both actions live in `app/(auth)/actions.ts`. They run before there's a session, so they don't call `requireUserId()`. Their first step is the rate limit instead:
 
-### Providers
+1. `rateLimit()` on the hashed client IP (sign-in 10 per 15 min, sign-up 5 per hour). If the limit is hit, return a `formFailure`.
+2. `safeParse` with `signInSchema` / `signUpSchema`.
+3. Sign-up only: `createUser` with the hashed password. `EmailTakenError` (duplicate key) becomes the email field error "An account with this email already exists".
+4. `signIn('credentials', { email, password, redirect: false })` in a `try`. `CredentialsSignin` becomes the form error "Email or password is incorrect"; anything else is rethrown.
+5. `redirect(safeCallbackUrl(callbackUrl))`, outside the `try`. `safeCallbackUrl` accepts only same-origin paths and falls back to `/dashboard`.
 
-Use OAuth providers (or email magic links). Don't add the Credentials provider for passwords: Linkbase doesn't store or hash passwords. Don't set `allowDangerousEmailAccountLinking`; it lets anyone who controls an email address at one provider take over the account created with another.
+The Auth.js `POST` endpoint is wrapped with the same sign-in limit, keyed the same way, so posting to `/api/auth/callback/credentials` directly doesn't get around it.
 
 ### Environment variables
 
 | Variable | Purpose |
 |---|---|
 | `AUTH_SECRET` | Encrypts session cookies. At least 32 random bytes (`npx auth secret`). Required in production. |
-| `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET` | OAuth credentials, one pair per provider (`AUTH_<PROVIDER>_ID` / `_SECRET`). |
 | `AUTH_URL` | Only when the canonical URL can't be inferred, for example behind a reverse proxy. |
 
 Set them in `.env.local` in development and list them in `.env.example` (`docs/security.md`, "Secrets"). Never commit real values. Rotating `AUTH_SECRET` signs everyone out.
+
+### Not built yet
+
+Email verification, password reset, and OAuth providers. Choosing a handle happens in onboarding (not built yet), not at sign-up. Adding OAuth later means adding a database-backed account-linking design. Never set `allowDangerousEmailAccountLinking`.
 
 ## Proxy
 
@@ -132,10 +133,15 @@ import { authConfig } from '@/lib/auth/auth-config'
 
 const { auth } = NextAuth(authConfig)
 
-const PUBLIC_PATHS = [/^\/$/, /^\/login$/, /^\/user\/[^/]+$/]
+const PUBLIC_PATHS = [/^\/$/, /^\/login$/, /^\/signup$/, /^\/user\/[^/]+$/]
+const AUTH_PAGES = [/^\/login$/, /^\/signup$/]
 
 export default auth((req) => {
   const { pathname, search } = req.nextUrl
+
+  if (req.auth && AUTH_PAGES.some((path) => path.test(pathname))) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
   if (req.auth || PUBLIC_PATHS.some((path) => path.test(pathname))) return
 
   const loginUrl = new URL('/login', req.nextUrl)
@@ -153,7 +159,7 @@ export const config = {
 
 - Proxy imports `auth-config.ts`, never `auth.ts`, so it never touches the database.
 - `PUBLIC_PATHS` and `matcher` must be constants. Next.js reads `matcher` at build time and ignores dynamic values.
-- `callbackUrl` is a relative path. Auth.js only redirects to the app's own origin after sign-in; don't override the `redirect` callback to loosen that.
+- `callbackUrl` is a relative path. The sign-in actions pass it through `safeCallbackUrl` before redirecting, and Auth.js only redirects to the app's own origin; don't override the `redirect` callback to loosen that.
 
 ## Server checks
 
@@ -163,15 +169,17 @@ export const config = {
 // lib/auth/require-user-id.ts
 import 'server-only'
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth/auth'
+import { getSession } from '@/lib/auth/get-session'
 
 export async function requireUserId() {
-  const session = await auth()
+  const session = await getSession()
   const userId = session?.user?.id
   if (!userId) redirect('/login')
   return userId
 }
 ```
+
+Server code reads the session through `getSession()` (`lib/auth/get-session.ts`), never `auth()` directly. It's `auth()` wrapped in `React.cache`, so the header, the page and `requireUserId()` decode the cookie once per request instead of once per caller.
 
 ### Server Actions
 
@@ -226,14 +234,11 @@ Nothing on the public page reveals whether the viewer is the owner, and it has n
 
 ## Signing in and out
 
-Use the `signIn` and `signOut` exports from `lib/auth/auth.ts` inside Server Actions, called from a `<form>`:
+Use the `signIn` and `signOut` exports from `lib/auth/auth.ts` inside Server Actions, called from a `<form>`. Sign-in and sign-up are the actions in `app/(auth)/actions.ts` ("Sign-up and sign-in flow" above). Sign-out is a menu item in the header's `UserMenu`:
 
 ```tsx
-// components/auth/sign-out-button.tsx
-import { signOut } from '@/lib/auth/auth'
-import { Button } from '@/components/ui/button'
-
-export function SignOutButton() {
+// components/auth/sign-out-form.tsx
+export function SignOutForm() {
   return (
     <form
       action={async () => {
@@ -241,11 +246,16 @@ export function SignOutButton() {
         await signOut({ redirectTo: '/' })
       }}
     >
-      <Button type="submit">Sign out</Button>
+      <button type="submit" role="menuitem" tabIndex={-1} className={menuItemClassName}>
+        <LogOut size={18} aria-hidden="true" />
+        Sign out
+      </button>
     </form>
   )
 }
 ```
+
+The header's account slot is `AccountNav` (`components/auth/account-nav.tsx`), a Server Component that reads the session with `getCurrentUser()`. It renders "Log in" / "Sign up free" when signed out, or `UserMenu` (a small Client Component that receives only `email`, and builds the avatar initial from it) with `SignOutForm` as its child. It always sits inside `<Suspense fallback={<AccountNavSkeleton />}>`, so pages that show it stay prerendered.
 
 Don't build sign-in or sign-out with `fetch` calls from Client Components. Server Actions get Next.js's built-in Origin check, and Auth.js's own endpoints carry their CSRF token.
 
@@ -256,5 +266,5 @@ Auth.js ships secure defaults. Don't override them:
 - **Cookies** are `HttpOnly`, `SameSite=Lax`, and `Secure` with a `__Secure-` prefix in production. Don't set `cookies` in the config.
 - **CSRF**: Auth.js endpoints use a double-submit token; Server Actions are POST-only and reject cross-origin requests.
 - **Redirects** are limited to the app's own origin.
-- **Session payload** stays small: `id`, `name`, `email`, `image`. Never put OAuth access or refresh tokens, roles from the client, or other secrets in the JWT or the session object; the session is readable by any Client Component it's passed to.
-- **Errors** shown on `/login` are generic. Don't echo provider error details back to the user.
+- **Session payload** stays small: `id` and `email`. Never put password hashes, roles from the client, or other secrets in the JWT or the session object; the session is readable by any Client Component it's passed to.
+- **Errors** shown on `/login` are generic: "Email or password is incorrect" whether the email or the password was wrong, and unknown emails take as long to reject as wrong passwords. Don't echo Auth.js error details back to the user.

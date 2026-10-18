@@ -12,10 +12,11 @@ For the file conventions themselves, see `01-app/03-api-reference/03-file-conven
 |---|---|---|
 | `/` | `app/page.tsx` | Public. Landing page. |
 | `/user/[handle]` | `app/user/[handle]/page.tsx` | Public. A user's profile and links. |
-| `/login` | `app/(auth)/login/page.tsx` | Public. Sign-in. |
+| `/login` | `app/(auth)/login/page.tsx` | Public. Log in with email and password. Signed-in users are redirected to `/dashboard`. |
+| `/signup` | `app/(auth)/signup/page.tsx` | Public. Create an account (email, password, confirm password; no name or handle). Signed-in users are redirected to `/dashboard`. |
 | `/dashboard` | `app/(dashboard)/dashboard/page.tsx` | Signed in. The user's links and profile. |
 | `/add-links` | `app/(dashboard)/add-links/page.tsx` | Signed in. Add a new link. |
-| `/api/auth/*` | `app/api/auth/[...nextauth]/route.ts` | Public. Auth.js endpoints and OAuth callbacks. |
+| `/api/auth/*` | `app/api/auth/[...nextauth]/route.ts` | Public. Auth.js session, CSRF, callback and sign-out endpoints. `POST` is rate-limited. |
 
 ## Directory tree
 
@@ -31,7 +32,9 @@ app/
     not-found.tsx                  Unknown handle
   (auth)/
     layout.tsx                     Minimal centered layout for auth screens
+    actions.ts                     signInWithCredentials, signUpWithCredentials
     login/page.tsx                 /login
+    signup/page.tsx                /signup
   (dashboard)/
     layout.tsx                     App chrome: nav, account menu, sign-out
     error.tsx                      Error boundary for every dashboard page

@@ -46,6 +46,23 @@ Before writing code that uses Next.js, React, Mongoose, NextAuth (Auth.js), Zod,
 - **No Context7 entry:** if Context7 has no entry for a library (or none for the installed version), say so before proceeding, and name the source used instead (bundled docs, the package's README or type definitions in `node_modules`).
 - **Context7 unavailable:** if the server fails to connect, say so rather than silently falling back to training data.
 
+## React performance rules (`vercel-react-best-practices`)
+
+The project skill `.claude/skills/vercel-react-best-practices` holds Vercel's React and Next.js performance rules. Invoke it with the Skill tool **before** writing, reviewing, or refactoring any React component, page, layout, data-loading code, or Server Action, including inside `plan-feature`, `create-feature`, and code reviews. Read the specific `rules/<rule>.md` files that apply; don't load the full `AGENTS.md` unless you need every rule.
+
+The rules that matter most here:
+
+- **Waterfalls:** start independent work with `Promise.all`, put `<Suspense>` around each slow part instead of awaiting at the top of a page, and move `await`s into the branch that needs them (`async-*`).
+- **Server:** deduplicate per-request reads with `React.cache` (for example `getSession()` in `lib/auth/get-session.ts`), pass Client Components only the fields they render, and never hold request data in module-level variables (`server-*`).
+- **Client:** keep `'use client'` on small leaves, derive state during render instead of syncing it in effects, put interaction logic in event handlers, and use functional `setState` (`rerender-*`).
+
+Where a rule conflicts with this repo, the project docs and the bundled Next.js docs win:
+
+- **Caching across requests:** use `'use cache'` with `cacheTag` / `cacheLife` (`docs/data-fetching.md`), not an LRU cache (`server-cache-lru`).
+- **Client-side fetching:** the app has none. Reads happen in Server Components through `lib/db`, so `client-swr-dedup` doesn't apply.
+- **Server Action order:** `server-auth-actions` matches `docs/data-mutations.md`. Rate-limited actions still check the limit before Zod validation, as `docs/security.md` requires, so invalid attempts count toward the limit. This is a deliberate exception to `async-cheap-condition-before-await`.
+- **`lucide-react` imports:** Next.js already optimizes them by default (`optimizePackageImports`), so keep named imports from `lucide-react` and don't use deep paths (`bundle-barrel-imports`).
+
 ## Doc Convention
 
 Whenever a new file is created in `/docs`, add it to the Project Docs section below with one line on what it covers and when to read it.

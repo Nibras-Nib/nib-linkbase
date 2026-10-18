@@ -2,7 +2,7 @@
 
 How the app stores and reads data: MongoDB through Mongoose. Read `docs/architecture.md` first for where `lib/` code lives and how Server Actions are named.
 
-Mongoose is not installed yet. Add it with `npm install mongoose` when the first model is written.
+Mongoose and `server-only` are installed and `lib/db/connect.ts` is in place. Add models under `lib/db/models` as features need them.
 
 ---
 
@@ -21,10 +21,24 @@ All database code is server-only. Mongoose needs the Node.js runtime, which this
 ```
 lib/db/
   connect.ts             Connection helper: connectToDatabase()
+  users.ts               createUser, findUserForSignIn
   models/
+    user.ts              User model (account: email, passwordHash)
+    rate-limit.ts        RateLimit model (fixed-window counters, TTL-deleted)
     profile.ts           Profile model (one per user, owns the handle)
     link.ts              Link model (many per user)
 ```
+
+### User
+
+`User` is the account. Its `_id` is the `userId` every other document references (`docs/auth.md`).
+
+| Field | Rules |
+|---|---|
+| `email` | Required, unique index, stored lowercase and trimmed, max 254. |
+| `passwordHash` | Required, `select: false`. scrypt hash from `lib/auth/password.ts`. |
+
+There's no name or handle on `User`. The handle and display name belong to `Profile` and are set in onboarding, not at sign-up. `findUserForSignIn` is the only unscoped user query (there's no session yet when it runs) and the only one that selects `passwordHash`. A duplicate email surfaces as `EmailTakenError` from `createUser`.
 
 Files are kebab-case and models are PascalCase, following `docs/architecture.md`. Each model file defines one schema and exports one model. Query functions for a model sit next to it or in `lib/db/`; they never live in components or route files.
 

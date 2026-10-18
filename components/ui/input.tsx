@@ -1,9 +1,11 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 
 type InputProps = {
   label?: string
   ariaLabel?: string
   prefix?: string
+  /** Rendered inside the field after the input, e.g. a show/hide password button */
+  suffix?: ReactNode
   placeholder?: string
   value?: string
   defaultValue?: string
@@ -11,15 +13,18 @@ type InputProps = {
   hint?: string
   error?: string
   tone?: 'default' | 'light'
-  type?: 'text' | 'email' | 'url' | 'search'
+  type?: 'text' | 'email' | 'url' | 'search' | 'password'
   name?: string
   autoComplete?: string
+  required?: boolean
+  minLength?: number
 }
 
 export function Input({
   label,
   ariaLabel,
   prefix,
+  suffix,
   placeholder,
   value,
   defaultValue,
@@ -30,6 +35,8 @@ export function Input({
   type = 'text',
   name,
   autoComplete,
+  required,
+  minLength,
 }: InputProps) {
   const hintId = useId()
   const message = error ?? hint
@@ -57,11 +64,14 @@ export function Input({
           value={value}
           defaultValue={defaultValue}
           autoComplete={autoComplete}
+          required={required}
+          minLength={minLength}
           aria-label={label ? undefined : ariaLabel}
           aria-invalid={error ? true : undefined}
           aria-describedby={message ? hintId : undefined}
           onChange={(event) => onChange?.(event.target.value)}
         />
+        {suffix ? <span className="-mr-2 flex flex-none items-center">{suffix}</span> : null}
       </span>
       {message && (
         <span id={hintId} className={`text-[13px] ${error ? 'text-danger' : 'text-fg-muted'}`}>

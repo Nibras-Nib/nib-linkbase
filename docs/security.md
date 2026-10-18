@@ -31,9 +31,8 @@ MONGODB_URI=
 # Session encryption key, at least 32 random bytes: npx auth secret
 AUTH_SECRET=
 
-# GitHub OAuth app (github.com/settings/developers)
-AUTH_GITHUB_ID=
-AUTH_GITHUB_SECRET=
+# Only when the canonical URL can't be inferred, e.g. self-hosted behind a reverse proxy
+# AUTH_URL=https://linkbase.me
 ```
 
 Rules:
@@ -41,7 +40,7 @@ Rules:
 - **Add a variable to `.env.example` in the same change that first reads it.**
 - **Server code reads secrets; client code never does.** Only `NEXT_PUBLIC_` variables reach the browser, and they're inlined into the JavaScript bundle at build time. Never give a secret a `NEXT_PUBLIC_` prefix.
 - **Fail fast when a variable is missing.** Code that needs a secret throws at startup if it isn't set (as `lib/db/connect.ts` does for `MONGODB_URI`), instead of failing on the first request.
-- **Use separate values per environment.** Development, preview and production each get their own database user, OAuth app and `AUTH_SECRET`.
+- **Use separate values per environment.** Development, preview and production each get their own database user and `AUTH_SECRET` (and their own OAuth app, if one is added).
 - **A leaked secret is rotated, not just deleted.** Removing it from the repo doesn't remove it from git history, forks or caches. Rotate it with the provider first, then clean up.
 - **Running more than one server instance?** Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` so all instances encrypt Server Action closures with the same key (`01-app/02-guides/data-security.md`).
 
@@ -64,7 +63,7 @@ const contentSecurityPolicy = [
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://github.com",
+  "form-action 'self'",
   "frame-ancestors 'none'",
   'upgrade-insecure-requests',
 ].join('; ')
@@ -111,12 +110,15 @@ Next.js puts inline scripts in every page. A CSP without `'unsafe-inline'` needs
 
 ## Rate limiting
 
-Rate limits stop brute force, spam and runaway clients. Two operations are limited from the start:
+Rate limits stop brute force, spam and runaway clients. Sign-in attempts and link creation are limited from the start; sign-up is limited too, since it's an unauthenticated write:
 
 | Operation | Key | Limit | Where it's enforced |
 |---|---|---|---|
-| Sign-in attempts | Client IP | 10 per 15 minutes | The sign-in Server Action, and `POST` in `app/api/auth/[...nextauth]/route.ts` |
+| Sign-in attempts | Client IP | 10 per 15 minutes | The sign-in Server Action in `app/(auth)/actions.ts`, and `POST` in `app/api/auth/[...nextauth]/route.ts` |
+| Sign-up | Client IP | 5 per hour | The sign-up Server Action in `app/(auth)/actions.ts` |
 | Link creation | `userId` | 30 per hour, and 100 links per user in total | `createLink` Server Action |
+
+Limits are defined once in the `rateLimits` map in `lib/security/rate-limit.ts`; actions pass `rateLimits.<name>` rather than inline numbers.
 
 Limits are counted in MongoDB, so they hold across server restarts and instances without new infrastructure:
 
@@ -133,7 +135,7 @@ In Server Actions, a limit hit is an **expected failure**, so it's returned, not
 
 ```ts
 // in createLink, after requireUserId() and before validation
-const limit = await rateLimit(`create-link:${userId}`, { limit: 30, windowSeconds: 3600 })
+const limit = await rateLimit(`create-link:${userId}`, rateLimits.createLink)
 if (!limit.ok) return formFailure("You're adding links quickly. Try again in a few minutes.")
 ```
 
